@@ -11,11 +11,12 @@ require('dotenv').config();
 // Middleware
 const allowedOrigins = [
     'http://localhost:5173',
-    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URL, // e.g. https://the-brandwave.vercel.app
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
+        console.log('CORS check for origin:', origin);
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -26,6 +27,19 @@ app.use(cors({
     allowedHeaders: ['Content-Type'],
     credentials: true,
 }));
+
+// respond to preflight requests
+app.options('*', cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+}));
+
 
 app.use(express.json());
 
