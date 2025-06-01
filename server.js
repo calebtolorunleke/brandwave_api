@@ -3,17 +3,20 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const User = require('./models/user'); // Make sure this file exists
 
-const app = express();
-
 require('dotenv').config();
 
+const app = express();
 
-// Middleware
+// Log FRONTEND_URL environment variable to verify it's set
+console.log('🛠️ FRONTEND_URL:', process.env.FRONTEND_URL);
+
+// Middleware: define allowed origins including your env var
 const allowedOrigins = [
     'http://localhost:5173',
     process.env.FRONTEND_URL, // e.g. https://the-brandwave.vercel.app
 ];
 
+// CORS middleware
 app.use(cors({
     origin: function (origin, callback) {
         console.log('CORS check for origin:', origin);
@@ -28,7 +31,7 @@ app.use(cors({
     credentials: true,
 }));
 
-// respond to preflight requests
+// Handle preflight requests globally
 app.options('*', cors({
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) {
@@ -40,10 +43,9 @@ app.options('*', cors({
     credentials: true,
 }));
 
-
 app.use(express.json());
 
-// MongoDB connection
+// Connect to MongoDB
 const uri = process.env.MONGODB_URI;
 mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('✅ MongoDB connected'))
@@ -81,7 +83,7 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// ✅ Login route
+// Login route
 app.post('/login', async (req, res) => {
     console.log("🛂 Login route hit");
 
@@ -111,12 +113,9 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// Start the server
-
+// Start server
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
 });
-
-
