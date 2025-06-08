@@ -1,22 +1,23 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const User = require('./models/user'); // Make sure this file exists
-
-require('dotenv').config();
+const User = require('./models/user');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 
-// Log FRONTEND_URL environment variable to verify it's set
-console.log('🛠️ FRONTEND_URL:', process.env.FRONTEND_URL);
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// Middleware: define allowed origins including your env var
+const client = new OAuth2Client(CLIENT_ID);
+
+// CORS setup
 const allowedOrigins = [
     'http://localhost:5173',
-    process.env.FRONTEND_URL, // e.g. https://the-brandwave.vercel.app
+    FRONTEND_URL,
 ];
 
-// CORS middleware
 app.use(cors({
     origin: function (origin, callback) {
         console.log('CORS check for origin:', origin);
@@ -31,7 +32,6 @@ app.use(cors({
     credentials: true,
 }));
 
-// Handle preflight requests globally
 app.options('*', cors({
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) {
@@ -46,8 +46,10 @@ app.options('*', cors({
 app.use(express.json());
 
 // Connect to MongoDB
-const uri = process.env.MONGODB_URI;
-mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+})
     .then(() => console.log('✅ MongoDB connected'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
@@ -83,7 +85,7 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Login route
+// Login route (email/password)
 app.post('/login', async (req, res) => {
     console.log("🛂 Login route hit");
 
@@ -110,6 +112,53 @@ app.post('/login', async (req, res) => {
         });
     } catch (error) {
         return res.status(500).json({ message: 'Login failed', error: error.message });
+    }
+});
+
+// Google login verification function
+async function verifyGoogleToken(token) {
+    const ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: CLIENT_ID,
+    });
+    return ticket.getPayload();
+}
+
+// Google Login route
+app.post('/google-login', async (req, res) => {
+    const { token } = req.body;
+
+    if (!token) {
+        return res.status(400).json({ message: 'Google token missing' });
+    }
+
+    try {
+        const payload = await verifyGoogleToken(token);
+        const { email, name, sub: googleId } = payload;
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+            user = new User({
+                fullName: name,
+                email,
+                googleId,
+                password: "", // No password for Google users
+            });
+            await user.save();
+        }
+
+        res.status(200).json({
+            message: 'Google login successful',
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+            },
+        });
+    } catch (error) {
+        console.error('Google login error:', error);
+        res.status(401).json({ message: 'Invalid Google token', error: error.message });
     }
 });
 
