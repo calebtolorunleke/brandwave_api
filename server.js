@@ -12,36 +12,32 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 const client = new OAuth2Client(CLIENT_ID);
 
-// CORS setup
-const allowedOrigins = [
-    'http://localhost:5173',
-    FRONTEND_URL,
-];
+const allowedOrigins = ['http://localhost:5173', FRONTEND_URL];
 
-app.use(cors({
+// Log incoming origin for debugging
+app.use((req, res, next) => {
+    console.log('Incoming request origin:', req.headers.origin);
+    next();
+});
+
+// Simplified CORS setup
+const corsOptions = {
     origin: function (origin, callback) {
-        console.log('CORS check for origin:', origin);
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
+        // allow requests with no origin (like mobile apps, curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            return callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
-    credentials: true,
-}));
+    credentials: false, // set true only if you use cookies or auth headers
+};
 
-app.options('*', cors({
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-}));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
